@@ -1,5 +1,4 @@
 //contracts/UniswapDEX.sol
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -7,103 +6,144 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./LPToken.sol";
 
 contract UniswapDEX {
-    IERC20 public tokenA;
-    IERC20 public tokenB;
+    // Updated variable names
+    IERC20 public nebulaCoin;
+    IERC20 public fluxToken;
     LPToken public lpToken;
 
-    uint256 public reserveA;
-    uint256 public reserveB;
+    uint256 public reserveNebula;
+    uint256 public reserveFlux;
     uint256 public totalLiquidity;
 
-    event Swap(address indexed trader, address tokenIn, uint256 amountIn, address tokenOut, uint256 amountOut);
-    event LiquidityAdded(address indexed provider, uint256 amountA, uint256 amountB, uint256 liquidity);
-    event LiquidityRemoved(address indexed provider, uint256 amountA, uint256 amountB, uint256 liquidityBurned);
+    event Swap(
+        address indexed trader,
+        address tokenIn,
+        uint256 amountIn,
+        address tokenOut,
+        uint256 amountOut
+    );
+    event LiquidityAdded(
+        address indexed provider,
+        uint256 amountNebula,
+        uint256 amountFlux,
+        uint256 liquidity
+    );
+    event LiquidityRemoved(
+        address indexed provider,
+        uint256 amountNebula,
+        uint256 amountFlux,
+        uint256 liquidityBurned
+    );
 
-    constructor(address _tokenA, address _tokenB, address _lpToken) {
-        tokenA = IERC20(_tokenA);
-        tokenB = IERC20(_tokenB);
+    constructor(address _nebula, address _flux, address _lpToken) {
+        nebulaCoin = IERC20(_nebula);
+        fluxToken = IERC20(_flux);
         lpToken = LPToken(_lpToken);
     }
 
     // Add liquidity function
-    function addLiquidity(uint256 amountA, uint256 amountB) external {
-        require(amountA > 0 && amountB > 0, "Invalid amounts");
+    function addLiquidity(uint256 amountNebula, uint256 amountFlux) external {
+        require(amountNebula > 0 && amountFlux > 0, "Invalid amounts");
 
-        tokenA.transferFrom(msg.sender, address(this), amountA);
-        tokenB.transferFrom(msg.sender, address(this), amountB);
+        nebulaCoin.transferFrom(msg.sender, address(this), amountNebula);
+        fluxToken.transferFrom(msg.sender, address(this), amountFlux);
 
         uint256 liquidityMinted;
         if (totalLiquidity == 0) {
-            liquidityMinted = sqrt(amountA * amountB);
+            liquidityMinted = sqrt(amountNebula * amountFlux);
         } else {
             liquidityMinted = min(
-                (amountA * totalLiquidity) / reserveA,
-                (amountB * totalLiquidity) / reserveB
+                (amountNebula * totalLiquidity) / reserveNebula,
+                (amountFlux * totalLiquidity) / reserveFlux
             );
         }
 
         require(liquidityMinted > 0, "Zero liquidity minted");
 
-        reserveA += amountA;
-        reserveB += amountB;
+        reserveNebula += amountNebula;
+        reserveFlux += amountFlux;
         totalLiquidity += liquidityMinted;
 
         lpToken.mint(msg.sender, liquidityMinted);
 
-        emit LiquidityAdded(msg.sender, amountA, amountB, liquidityMinted);
+        emit LiquidityAdded(
+            msg.sender,
+            amountNebula,
+            amountFlux,
+            liquidityMinted
+        );
     }
 
     // Remove liquidity function
     function removeLiquidity(uint256 liquidity) external {
-        require(lpToken.balanceOf(msg.sender) >= liquidity, "Not enough liquidity");
+        require(
+            lpToken.balanceOf(msg.sender) >= liquidity,
+            "Not enough liquidity"
+        );
 
-        uint256 amountA = (liquidity * reserveA) / totalLiquidity;
-        uint256 amountB = (liquidity * reserveB) / totalLiquidity;
+        uint256 amountNebula = (liquidity * reserveNebula) / totalLiquidity;
+        uint256 amountFlux = (liquidity * reserveFlux) / totalLiquidity;
 
         lpToken.burn(msg.sender, liquidity);
 
-        reserveA -= amountA;
-        reserveB -= amountB;
+        reserveNebula -= amountNebula;
+        reserveFlux -= amountFlux;
         totalLiquidity -= liquidity;
 
-        tokenA.transfer(msg.sender, amountA);
-        tokenB.transfer(msg.sender, amountB);
+        nebulaCoin.transfer(msg.sender, amountNebula);
+        fluxToken.transfer(msg.sender, amountFlux);
 
-        emit LiquidityRemoved(msg.sender, amountA, amountB, liquidity);
+        emit LiquidityRemoved(msg.sender, amountNebula, amountFlux, liquidity);
     }
 
-    // Swap Token A to Token B
-    function swapAforB(uint256 amountIn) external {
+    // Swap NebulaCoin for FluxToken
+    function swapNebulaForFlux(uint256 amountIn) external {
         require(amountIn > 0, "Invalid amount");
 
-        tokenA.transferFrom(msg.sender, address(this), amountIn);
+        nebulaCoin.transferFrom(msg.sender, address(this), amountIn);
 
-        uint256 amountOut = getAmountOut(amountIn, reserveA, reserveB);
-        tokenB.transfer(msg.sender, amountOut);
+        uint256 amountOut = getAmountOut(amountIn, reserveNebula, reserveFlux);
+        fluxToken.transfer(msg.sender, amountOut);
 
-        reserveA += amountIn;
-        reserveB -= amountOut;
+        reserveNebula += amountIn;
+        reserveFlux -= amountOut;
 
-        emit Swap(msg.sender, address(tokenA), amountIn, address(tokenB), amountOut);
+        emit Swap(
+            msg.sender,
+            address(nebulaCoin),
+            amountIn,
+            address(fluxToken),
+            amountOut
+        );
     }
 
-    // Swap Token B to Token A
-    function swapBforA(uint256 amountIn) external {
+    // Swap FluxToken for NebulaCoin
+    function swapFluxForNebula(uint256 amountIn) external {
         require(amountIn > 0, "Invalid amount");
 
-        tokenB.transferFrom(msg.sender, address(this), amountIn);
+        fluxToken.transferFrom(msg.sender, address(this), amountIn);
 
-        uint256 amountOut = getAmountOut(amountIn, reserveB, reserveA);
-        tokenA.transfer(msg.sender, amountOut);
+        uint256 amountOut = getAmountOut(amountIn, reserveFlux, reserveNebula);
+        nebulaCoin.transfer(msg.sender, amountOut);
 
-        reserveB += amountIn;
-        reserveA -= amountOut;
+        reserveFlux += amountIn;
+        reserveNebula -= amountOut;
 
-        emit Swap(msg.sender, address(tokenB), amountIn, address(tokenA), amountOut);
+        emit Swap(
+            msg.sender,
+            address(fluxToken),
+            amountIn,
+            address(nebulaCoin),
+            amountOut
+        );
     }
 
     // Get swap output using constant product formula with 0.3% fee
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) public pure returns (uint256) {
+    function getAmountOut(
+        uint256 amountIn,
+        uint256 reserveIn,
+        uint256 reserveOut
+    ) public pure returns (uint256) {
         uint256 amountInWithFee = amountIn * 997; // 0.3% fee
         uint256 numerator = amountInWithFee * reserveOut;
         uint256 denominator = (reserveIn * 1000) + amountInWithFee;
